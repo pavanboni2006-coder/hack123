@@ -789,204 +789,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    const authForm = document.querySelector("[data-auth-form]");
-    const authErrorBanner = document.querySelector("[data-auth-form-error]");
-
-    const updatePasswordStrength = (input) => {
-        if (!input || !input.dataset.passwordStrengthTarget) {
-            return;
-        }
-
-        const container = document.getElementById(input.dataset.passwordStrengthTarget);
-        if (!container) {
-            return;
-        }
-
-        const fill = container.querySelector("[data-password-strength-fill]");
-        const textNode = container.querySelector("[data-password-strength-text]");
-        const value = input.value || "";
-        let score = 0;
-        if (value.length >= 8) score += 1;
-        if (/[A-Za-z]/.test(value)) score += 1;
-        if (/\d/.test(value)) score += 1;
-        if (/[^A-Za-z0-9]/.test(value)) score += 1;
-
-        const widths = ["0%", "28%", "52%", "76%", "100%"];
-        const tones = ["is-empty", "is-weak", "is-fair", "is-good", "is-strong"];
-        container.classList.remove(...tones);
-        container.classList.add(tones[Math.min(score, tones.length - 1)]);
-
-        if (fill) {
-            fill.style.width = widths[Math.min(score, widths.length - 1)];
-        }
-
-        if (textNode) {
-            if (!value) {
-                textNode.textContent = "Use 8+ characters with letters and numbers.";
-            } else if (score <= 1) {
-                textNode.textContent = "Password is too weak. Add more characters and a number.";
-            } else if (score === 2) {
-                textNode.textContent = "Almost there. Add a number or symbol to strengthen it.";
-            } else if (score === 3) {
-                textNode.textContent = "Good password. A symbol can make it even stronger.";
-            } else {
-                textNode.textContent = "Strong password. You are ready to continue.";
-            }
-        }
-    };
-
-    const setFieldState = (input, message = "") => {
-        if (!input) {
-            return;
-        }
-
-        const note = document.querySelector(`[data-field-note-for="${input.id}"]`);
-        const hasError = Boolean(message);
-        input.classList.toggle("is-invalid", hasError);
-        input.setAttribute("aria-invalid", hasError ? "true" : "false");
-
-        if (note) {
-            note.textContent = message || note.dataset.defaultText || note.textContent;
-            note.classList.toggle("field-error", hasError);
-            if (!note.dataset.defaultText) {
-                note.dataset.defaultText = note.textContent;
-            }
-        }
-    };
-
-    const validateField = (input, mode) => {
-        if (!input) {
-            return "";
-        }
-
-        const value = (input.value || "").trim();
-        const kind = input.dataset.authValidate || "";
-        if (!kind) {
-            return "";
-        }
-
-        if (kind === "email") {
-            if (!value) return "Enter your email address.";
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Enter a valid email address.";
-            return "";
-        }
-        if (kind === "password") {
-            if (!value) return "Enter your password.";
-            if (value.length < 8) return "Use at least 8 characters.";
-            if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) return "Add at least one letter and one number.";
-            return "";
-        }
-        if (kind === "confirm_password") {
-            const original = document.getElementById("reset-password")?.value || "";
-            if (!value) return "Confirm the new password.";
-            if (value !== original) return "Passwords do not match yet.";
-            return "";
-        }
-        if (kind === "otp") {
-            input.value = value.replace(/\D+/g, "").slice(0, 6);
-            if (input.value.length !== 6) return "OTP must contain exactly 6 digits.";
-            return "";
-        }
-        if (kind === "full_name") {
-            if (value.length < 3) return "Enter the full name used for your account.";
-            return "";
-        }
-        if (kind === "city") {
-            if (value.length < 2) return "Enter your city to continue.";
-            return "";
-        }
-        if (kind === "username") {
-            if (!/^[a-zA-Z0-9_.-]{4,24}$/.test(value)) return "Use 4 to 24 characters with letters, numbers, dots, dashes, or underscores.";
-            return "";
-        }
-        if (kind === "pincode") {
-            input.value = value.replace(/\D+/g, "").slice(0, 6);
-            if (input.value && input.value.length !== 6) return "Pincode must contain 6 digits.";
-            return "";
-        }
-
-        return "";
-    };
-
-    if (authForm) {
-        authForm.querySelectorAll("[data-field-note-for]").forEach((note) => {
-            note.dataset.defaultText = note.textContent;
-        });
-
-        const authMode = authForm.dataset.authMode || "";
-        const inputs = Array.from(authForm.querySelectorAll("input[data-auth-validate], textarea[data-auth-validate], select[data-auth-validate]"));
-        const submitButton = authForm.querySelector("[data-auth-submit]");
-
-        const showFormError = (message = "") => {
-            if (!authErrorBanner) {
-                return;
-            }
-            authErrorBanner.textContent = message;
-            authErrorBanner.classList.toggle("hidden", !message);
-        };
-
-        const runValidation = () => {
-            let firstError = "";
-            inputs.forEach((input) => {
-                const error = validateField(input, authMode);
-                setFieldState(input, error);
-                if (!firstError && error) {
-                    firstError = error;
-                }
-            });
-            showFormError(firstError);
-            return !firstError;
-        };
-
-        inputs.forEach((input) => {
-            if (input.matches("[data-otp-input], [data-auth-validate='pincode']")) {
-                input.addEventListener("input", () => {
-                    input.value = input.value.replace(/\D+/g, "").slice(0, input.maxLength || 255);
-                    const error = validateField(input, authMode);
-                    setFieldState(input, error);
-                    showFormError("");
-                });
-            } else {
-                input.addEventListener("input", () => {
-                    const error = validateField(input, authMode);
-                    setFieldState(input, error);
-                    showFormError("");
-                });
-            }
-
-            input.addEventListener("blur", () => {
-                const error = validateField(input, authMode);
-                setFieldState(input, error);
-            });
-
-            if (input.dataset.passwordStrengthTarget) {
-                updatePasswordStrength(input);
-                input.addEventListener("input", () => updatePasswordStrength(input));
-            }
-        });
-
-        authForm.addEventListener("submit", (event) => {
-            if (!runValidation()) {
-                event.preventDefault();
-                const firstInvalid = authForm.querySelector(".is-invalid");
-                if (firstInvalid) {
-                    firstInvalid.focus();
-                }
-                return;
-            }
-
-            if (submitButton) {
-                submitButton.classList.add("is-loading");
-                submitButton.setAttribute("aria-busy", "true");
-                const loadingLabel = submitButton.dataset.loadingLabel;
-                if (loadingLabel) {
-                    submitButton.dataset.originalHtml = submitButton.innerHTML;
-                    submitButton.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${loadingLabel}`;
-                }
-            }
-        });
-    }
-
     if (typeof window.sfEnsureRuntimePageTranslation === "function") {
         window.sfEnsureRuntimePageTranslation().catch(() => undefined);
     }
@@ -1414,4 +1216,105 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         revealItems.forEach((item) => item.classList.add("is-visible"));
     }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const farmerForms = document.querySelectorAll("[data-farmer-crop-form]");
+  const categoryHints = {
+    "Vegetables": "Fresh vegetables usually convert better with smaller MOQs and same-day availability.",
+    "Fruits": "Mention ripeness, packaging, and delivery radius for fruit buyers.",
+    "Grains": "Bulk grain buyers look for moisture, storage notes, and larger minimum order quantities.",
+    "Rice Varieties": "Add grade, harvest season, and milling quality for rice listings.",
+    "Pulses": "Pulse buyers value cleaning quality, packaging, and consistent batch sizing.",
+    "Spices": "Spice listings perform better with aroma, source, and dryness notes.",
+    "Organic Products": "Organic listings should connect proof, farm practices, and premium context.",
+  };
+
+  const wirePreview = (inputId, imageId, labelId, shellId) => {
+    const input = document.getElementById(inputId);
+    const image = document.getElementById(imageId);
+    const label = document.getElementById(labelId);
+    const shell = document.getElementById(shellId);
+    if (!input || !image || !label || !shell) return;
+
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (!file) {
+        image.classList.add("hidden");
+        image.removeAttribute("src");
+        label.textContent = "";
+        if (!shell.querySelector("img:not(.hidden)")) {
+          shell.classList.add("hidden");
+        }
+        return;
+      }
+      image.src = URL.createObjectURL(file);
+      image.classList.remove("hidden");
+      label.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+      shell.classList.remove("hidden");
+    });
+  };
+
+  wirePreview("crop_image", "listing-image-preview", "listing-image-label", "listing-image-preview-shell");
+  wirePreview("quality_proof", "listing-proof-preview", "listing-proof-label", "listing-image-preview-shell");
+  wirePreview("edit-crop-image", "edit-image-preview", "edit-image-label", "edit-preview-shell");
+  wirePreview("edit-quality-proof", "edit-proof-preview", "edit-proof-label", "edit-preview-shell");
+
+  const hintTarget = document.getElementById("price_suggestion");
+  const categorySelect = document.querySelector("[data-price-hint-source]");
+  if (hintTarget && categorySelect) {
+    const refreshHint = () => {
+      hintTarget.textContent = categoryHints[categorySelect.value] || "Use clear pricing, recent harvest details, and proof photos to improve buyer confidence.";
+    };
+    categorySelect.addEventListener("change", refreshHint);
+    refreshHint();
+  }
+
+  farmerForms.forEach((form) => {
+    const quantityField = form.querySelector('input[name="quantity"]');
+    const priceField = form.querySelector('input[name="price"]');
+    const moqField = form.querySelector('input[name="min_order_quantity"]');
+    const unitField = form.querySelector('input[name="unit"]');
+    const estimatedValueTarget = form.querySelector("[data-estimated-value]");
+    const suggestedMoqTarget = form.querySelector("[data-suggested-moq]");
+
+    const recalc = () => {
+      const quantity = Number(quantityField && quantityField.value ? quantityField.value : 0);
+      const price = Number(priceField && priceField.value ? priceField.value : 0);
+      const estimated = Math.round(quantity * price);
+      if (estimatedValueTarget) {
+        estimatedValueTarget.textContent = `₹${estimated.toLocaleString()}`;
+      }
+      if (suggestedMoqTarget) {
+        const suggested = quantity >= 250 ? 25 : quantity >= 100 ? 10 : quantity >= 25 ? 5 : 1;
+        suggestedMoqTarget.textContent = String(moqField && moqField.value ? moqField.value : suggested);
+      }
+      if (unitField && suggestedMoqTarget && suggestedMoqTarget.nextSibling && suggestedMoqTarget.nextSibling.nodeType === Node.TEXT_NODE) {
+        suggestedMoqTarget.nextSibling.textContent = ` ${unitField.value || "kg"}`;
+      }
+    };
+
+    [quantityField, priceField, moqField, unitField].forEach((field) => {
+      if (field) field.addEventListener("input", recalc);
+    });
+    recalc();
+
+    form.addEventListener("submit", (event) => {
+      const errors = [];
+      const name = form.querySelector('input[name="name"]');
+      const district = form.querySelector('input[name="district"]');
+      const village = form.querySelector('input[name="village"]');
+      const pincode = form.querySelector('input[name="pincode"]');
+      const description = form.querySelector('textarea[name="description"]');
+      if (name && name.value.trim().length < 3) errors.push("Product name should be at least 3 characters.");
+      if (district && district.value.trim().length < 2) errors.push("District is required.");
+      if (village && village.value.trim().length < 2) errors.push("Village is required.");
+      if (pincode && !/^\d{6}$/.test(pincode.value.trim())) errors.push("Pincode must be 6 digits.");
+      if (description && description.value.trim().length > 900) errors.push("Description must stay under 900 characters.");
+      if (errors.length) {
+        event.preventDefault();
+        window.alert(errors[0]);
+      }
+    });
+  });
 });
