@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="surface-panel reveal farmer-form-shell rounded-[1.8rem] px-5 py-6 sm:px-7 sm:py-8">
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+      <span class="section-kicker"><i class="fa-solid fa-pen-to-square"></i> Listing editor</span>
+      <h1 class="mt-4 font-display text-3xl font-semibold text-soil sm:text-[2.7rem]">Refine your harvest details</h1>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-ink/70">Update stock, pricing, tags, and fulfilment signals without leaving the farmer workspace.</p>
+    </div>
+    <div class="listing-tip-card">
+      <p class="listing-tip-label">Category guidance</p>
+      <p id="price_suggestion" class="listing-tip-copy">{{ price_hint }}</p>
+    </div>
+  </div>
+
+  {% if errors.general %}
+  <div class="mt-5 rounded-[1rem] border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">{{ errors.general }}</div>
+  {% endif %}
+
+  <div class="mt-7 grid gap-7 xl:grid-cols-[0.95fr_1.05fr]">
+    <div class="space-y-5">
+      <div class="surface-card p-5 sm:p-6">
+        <p class="section-kicker"><i class="fa-solid fa-image"></i> Current gallery</p>
+        <div class="mt-5 grid gap-4">
+          <div>
+            <p class="field-label">Crop image</p>
+            {% if crop.image_url %}
+            <img src="{{ url_for('static', filename=crop.image_url) }}" alt="{{ draft.name }}" class="mt-3 max-h-72 w-full rounded-[1.25rem] object-cover">
+            {% else %}
+            <div class="empty-preview-card mt-3"><i class="fa-solid fa-seedling"></i><span>No crop image yet</span></div>
+            {% endif %}
+          </div>
+          <div>
+            <p class="field-label">Quality proof</p>
+            {% if crop.quality_proof %}
+            <img src="{{ url_for('static', filename=crop.quality_proof) }}" alt="Quality proof" class="mt-3 max-h-72 w-full rounded-[1.25rem] object-cover">
+            {% else %}
+            <div class="empty-preview-card mt-3"><i class="fa-solid fa-shield-check"></i><span>No proof image yet</span></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-card p-5 sm:p-6">
+        <p class="section-kicker"><i class="fa-solid fa-chart-line"></i> Listing health snapshot</p>
+        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+          <div class="mini-stat-card"><span>Inventory value</span><strong>₹{{ crop.inventory_value or 0 }}</strong></div>
+          <div class="mini-stat-card"><span>Health score</span><strong>{{ crop.health_score or 0 }}/100</strong></div>
+          <div class="mini-stat-card"><span>Stock status</span><strong>{{ crop.stock_status or 'Healthy stock' }}</strong></div>
+          <div class="mini-stat-card"><span>Location</span><strong>{{ crop.location_label or 'Not set' }}</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <form action="{{ url_for('edit_crop', id=crop.id) }}" method="POST" enctype="multipart/form-data" class="space-y-5" data-farmer-crop-form>
+      <div class="surface-card p-5 sm:p-6">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <label class="field-label" for="name">Harvest name</label>
+            <input id="name" class="input-shell" type="text" name="name" value="{{ draft.name }}" required>
+            {% if errors.name %}<p class="field-error">{{ errors.name }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="field-label" for="category">Category</label>
+            <select id="category" class="select-shell" name="category" data-price-hint-source>
+              {% for category in form_options.categories %}
+              <option value="{{ category }}" {% if draft.category == category %}selected{% endif %}>{{ category }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="quality">Quality</label>
+            <select id="quality" class="select-shell" name="quality">
+              {% for quality in form_options.qualities %}
+              <option value="{{ quality }}" {% if draft.quality == quality %}selected{% endif %}>{{ quality }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="quantity">Stock</label>
+            <input id="quantity" class="input-shell" type="number" step="0.1" name="quantity" value="{{ draft.quantity }}" required>
+            {% if errors.quantity %}<p class="field-error">{{ errors.quantity }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="field-label" for="price">Price per unit</label>
+            <input id="price" class="input-shell" type="number" step="0.01" name="price" value="{{ draft.price }}" required>
+            {% if errors.price %}<p class="field-error">{{ errors.price }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="field-label" for="unit">Unit</label>
+            <input id="unit" class="input-shell" type="text" name="unit" value="{{ draft.unit }}">
+          </div>
+          <div>
+            <label class="field-label" for="min_order_quantity">Minimum order quantity</label>
+            <input id="min_order_quantity" class="input-shell" type="number" step="0.1" name="min_order_quantity" value="{{ draft.min_order_quantity }}">
+          </div>
+          <div>
+            <label class="field-label" for="delivery_radius_km">Delivery radius (km)</label>
+            <input id="delivery_radius_km" class="input-shell" type="number" step="1" name="delivery_radius_km" value="{{ draft.delivery_radius_km }}">
+          </div>
+          <div>
+            <label class="field-label" for="demand_score">Demand score</label>
+            <input id="demand_score" class="input-shell" type="number" step="1" name="demand_score" value="{{ draft.demand_score }}">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="tags">Tags</label>
+            <input id="tags" class="input-shell" type="text" name="tags" value="{{ draft.tags }}" placeholder="organic, export, premium">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="description">Description and notes</label>
+            <textarea id="description" class="textarea-shell" name="description">{{ draft.description }}</textarea>
+            {% if errors.description %}<p class="field-error">{{ errors.description }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="field-label" for="state">State</label>
+            <select id="state" class="select-shell" name="state">
+              {% for state in form_options.states %}
+              <option value="{{ state }}" {% if draft.state == state %}selected{% endif %}>{{ state }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="district">District</label>
+            <input id="district" class="input-shell" type="text" name="district" value="{{ draft.district }}">
+          </div>
+          <div>
+            <label class="field-label" for="village">Village</label>
+            <input id="village" class="input-shell" type="text" name="village" value="{{ draft.village }}">
+          </div>
+          <div>
+            <label class="field-label" for="pincode">Pincode</label>
+            <input id="pincode" class="input-shell" type="text" name="pincode" value="{{ draft.pincode }}">
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-card p-5 sm:p-6">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="field-label" for="edit-crop-image">Replace crop image</label>
+            <input id="edit-crop-image" class="file-input file-shell" type="file" name="image" accept="image/*">
+          </div>
+          <div>
+            <label class="field-label" for="edit-quality-proof">Replace quality proof</label>
+            <input id="edit-quality-proof" class="file-input file-shell" type="file" name="quality_proof" accept="image/*">
+          </div>
+        </div>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <label class="toggle-card">
+            <input type="checkbox" name="same_day_available" {% if draft.same_day_available %}checked{% endif %}>
+            <span><strong>Same-day delivery slots</strong><small>Promote this listing for quick-dispatch buyers.</small></span>
+          </label>
+          <label class="toggle-card">
+            <input type="checkbox" name="organic" {% if draft.organic %}checked{% endif %}>
+            <span><strong>Organic / residue aware</strong><small>Use when farming notes and proof support it.</small></span>
+          </label>
+        </div>
+        <div id="edit-preview-shell" class="hidden farmer-upload-preview mt-5">
+          <div>
+            <img id="edit-image-preview" alt="Crop image preview" class="hidden max-h-48 w-full rounded-[1rem] object-cover">
+            <p id="edit-image-label" class="preview-label"></p>
+          </div>
+          <div>
+            <img id="edit-proof-preview" alt="Quality proof preview" class="hidden max-h-48 w-full rounded-[1rem] object-cover">
+            <p id="edit-proof-label" class="preview-label"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <button type="submit" class="btn-primary-app flex-1 justify-center">Save changes <i class="fa-solid fa-floppy-disk"></i></button>
+        <a href="{{ url_for('farmer_dashboard') }}" class="btn-outline-app flex-1 justify-center"><i class="fa-solid fa-arrow-left"></i> Back to dashboard</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
