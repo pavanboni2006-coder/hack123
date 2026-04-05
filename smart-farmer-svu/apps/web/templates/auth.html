@@ -275,6 +275,9 @@
             data-a11y-speak-success="{{ t('auth.accessibility.speak_success', 'Speech added to the field.') }}"
             data-a11y-select-field="{{ t('auth.accessibility.select_field', 'Select a field first.') }}"
             data-a11y-selection-started="{{ t('auth.accessibility.selection_started', 'Reading selected text.') }}">
+            {% if next_path %}
+            <input type="hidden" name="next" value="{{ next_path }}">
+            {% endif %}
             {% if mode == 'login' %}
             <div>
                 <label class="field-label" for="email">{{ t('auth.login.email', 'Registered email') }}</label>
@@ -285,7 +288,7 @@
             <div>
                 <div class="flex items-center justify-between gap-3">
                     <label class="field-label mb-0" for="login-password">{{ t('auth.login.password', 'Password') }}</label>
-                    <a href="{{ url_for('forgot_password') }}" class="text-sm font-bold text-leaf">{{ t('auth.login.forgot_password', 'Forgot password?') }}</a>
+                    <a href="{{ forgot_password_href or url_for('forgot_password') }}" class="text-sm font-bold text-leaf">{{ t('auth.login.forgot_password', 'Forgot password?') }}</a>
                 </div>
                 <div class="auth-password-wrap mt-2">
                     <input id="login-password" class="input-shell pr-12" type="password" name="password" data-auth-a11y-field
@@ -457,19 +460,19 @@
         <div class="auth-inline-note mt-6 rounded-[1.2rem] border border-soil/8 bg-white/60 px-4 py-3.5 text-sm text-ink/68">
             {% if mode == 'login' %}
             <span class="control-label">{{ t('auth.login.new_user', 'New to Smart Farmer?') }}</span>
-            <a href="{{ url_for('register') }}" class="font-bold text-leaf"><span class="control-label">{{ t('auth.login.create_account', 'Create an account') }}</span></a>
+            <a href="{{ register_href or url_for('register') }}" class="font-bold text-leaf"><span class="control-label">{{ t('auth.login.create_account', 'Create an account') }}</span></a>
             {% elif mode == 'register' %}
             {{ t('auth.register.registered', 'Already registered?') }}
-            <a href="{{ url_for('login') }}" class="font-bold text-leaf">{{ t('auth.register.sign_in', 'Go to sign in') }}</a>
+            <a href="{{ login_href or url_for('login') }}" class="font-bold text-leaf">{{ t('auth.register.sign_in', 'Go to sign in') }}</a>
             {% elif mode == 'forgot_password' %}
             {{ t('auth.forgot.remembered', 'Remembered your password?') }}
-            <a href="{{ url_for('login') }}" class="font-bold text-leaf">{{ t('auth.forgot.back_to_login', 'Go to sign in') }}</a>
+            <a href="{{ login_href or url_for('login') }}" class="font-bold text-leaf">{{ t('auth.forgot.back_to_login', 'Go to sign in') }}</a>
             {% elif mode in ['reset_verify', 'reset_password'] %}
             {{ t('auth.reset_password.start_again', 'Need to use a different email?') }}
             <a href="{{ url_for('forgot_password') }}" class="font-bold text-leaf">{{ t('auth.reset_password.request_again', 'Start again') }}</a>
             {% else %}
             {{ t('auth.register.registered', 'Already registered?') }}
-            <a href="{{ url_for('login') }}" class="font-bold text-leaf">{{ t('auth.register.sign_in', 'Go to sign in') }}</a>
+            <a href="{{ login_href or url_for('login') }}" class="font-bold text-leaf">{{ t('auth.register.sign_in', 'Go to sign in') }}</a>
             {% endif %}
         </div>
     </div>

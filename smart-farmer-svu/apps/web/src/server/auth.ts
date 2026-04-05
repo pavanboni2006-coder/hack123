@@ -15,7 +15,7 @@ import {
   type SessionUser,
 } from "@/lib/auth";
 import { COOKIE_NAMES } from "@/lib/cookies";
-import { redirect, redirectWithFlash } from "@/lib/http";
+import { redirect, redirectWithFlash, sanitizeNextUrl } from "@/lib/http";
 import { normalizeLanguage } from "@/lib/language";
 import { renderTemplate } from "@/lib/template";
 
@@ -33,12 +33,48 @@ function applyPreferredLanguage(response: NextResponse, user?: SessionUser | nul
   });
 }
 
+function defaultPostAuthPath(user?: SessionUser | null): string {
+  if (!user) {
+    return "/";
+  }
+  if (user.role === "farmer") {
+    return "/farmer/dashboard";
+  }
+  if (user.role === "admin") {
+    return "/admin/dashboard";
+  }
+  return "/marketplace";
+}
+
+function getRequestedNextPath(request: NextRequest, fallback?: string | null): string {
+  const fromQuery = sanitizeNextUrl(request.nextUrl.searchParams.get("next"));
+  const fromFallback = sanitizeNextUrl(fallback || "/");
+  return fromQuery !== "/" ? fromQuery : fromFallback;
+}
+
+function buildAuthHref(pathname: string, nextPath: string): string {
+  return nextPath && nextPath !== "/" ? `${pathname}?next=${encodeURIComponent(nextPath)}` : pathname;
+}
+
+function buildAuthTemplateContext(request: NextRequest, mode: string, formAction: string, extra: Record<string, unknown> = {}) {
+  const nextPath = getRequestedNextPath(request);
+  return {
+    mode,
+    form_action: formAction,
+    next_path: nextPath !== "/" ? nextPath : "",
+    login_href: buildAuthHref("/login", nextPath),
+    register_href: buildAuthHref("/register", nextPath),
+    forgot_password_href: buildAuthHref("/forgot_password", nextPath),
+    ...extra,
+  };
+}
+
 export async function loginPage(request: NextRequest): Promise<NextResponse> {
   const session = getSessionState(request);
   if (session.user) {
     return redirect(request, "/");
   }
-  return renderTemplate(request, "auth.html", { mode: "login", form_action: "/login" }, "login");
+  return renderTemplate(request, "auth.html", buildAuthTemplateContext(request, "login", "/login"), "login");
 }
 
 export async function loginAction(request: NextRequest): Promise<NextResponse> {
@@ -53,11 +89,13 @@ export async function loginAction(request: NextRequest): Promise<NextResponse> {
   if (!response.ok || !data.success) {
     return redirectWithFlash(request, "/login", "error", String(data.message || "Invalid email or password"));
   }
-  const next = redirect(request, "/verify");
+  const nextPath = sanitizeNextUrl(getString(formData, "next"));
+  const next = redirect(request, buildAuthHref("/verify", nextPath));
   setPreAuth(next, {
     challengeId: String(data.challenge_id),
     email: String(data.email || getString(formData, "email")),
     purpose: String(data.purpose || "login"),
+    redirectTo: nextPath !== "/" ? nextPath : undefined,
   });
   return next;
 }
@@ -70,11 +108,10 @@ export async function verifyPage(request: NextRequest): Promise<NextResponse> {
   return renderTemplate(
     request,
     "auth.html",
-    {
-      mode: "verify",
+    buildAuthTemplateContext(request, "verify", "/verify", {
       email: session.preAuth.email,
-      form_action: "/verify",
-    },
+      next_path: session.preAuth.redirectTo || "",
+    }),
     "verify",
   );
 }
@@ -127,7 +164,8 @@ export async function verifyAction(request: NextRequest): Promise<NextResponse> 
   if (!response.ok || !data.success) {
     return redirectWithFlash(request, "/verify", "error", String(data.message || "Incorrect OTP"));
   }
-  const next = redirect(request, String(data.redirect || "/"));
+  const nextPath = sanitizeNextUrl(session.preAuth.redirectTo || String(data.redirect || defaultPostAuthPath(data.user as SessionUser)));
+  const next = redirect(request, nextPath);
   persistAuth(next, String(data.token), data.user as SessionUser);
   applyPreferredLanguage(next, data.user as SessionUser);
   clearPreAuth(next);
@@ -137,7 +175,7 @@ export async function verifyAction(request: NextRequest): Promise<NextResponse> 
 }
 
 export async function registerPage(request: NextRequest): Promise<NextResponse> {
-  return renderTemplate(request, "auth.html", { mode: "register", form_action: "/register" }, "register");
+  return renderTemplate(request, "auth.html", buildAuthTemplateContext(request, "register", "/register"), "register");
 }
 
 export async function registerAction(request: NextRequest): Promise<NextResponse> {
@@ -159,11 +197,12 @@ export async function registerAction(request: NextRequest): Promise<NextResponse
   if (!response.ok || !data.success) {
     return redirectWithFlash(request, "/register", "error", String(data.message || "Registration failed"));
   }
-  return redirectWithFlash(request, "/login", "success", String(data.message || "Registration successful! Please login."));
+  const nextPath = sanitizeNextUrl(getString(formData, "next"));
+  return redirectWithFlash(request, buildAuthHref("/login", nextPath), "success", String(data.message || "Registration successful! Please login."));
 }
 
 export async function forgotPasswordPage(request: NextRequest): Promise<NextResponse> {
-  return renderTemplate(request, "auth.html", { mode: "forgot_password", form_action: "/forgot_password" }, "forgot_password");
+  return renderTemplate(request, "auth.html", buildAuthTemplateContext(request, "forgot_password", "/forgot_password"), "forgot_password");
 }
 
 export async function forgotPasswordAction(request: NextRequest): Promise<NextResponse> {
@@ -177,12 +216,14 @@ export async function forgotPasswordAction(request: NextRequest): Promise<NextRe
   if (!response.ok || !data.success) {
     return redirectWithFlash(request, "/forgot_password", "error", String(data.message || "Unable to start password reset"));
   }
-  const next = redirect(request, "/reset_password/verify");
+  const nextPath = sanitizeNextUrl(getString(formData, "next"));
+  const next = redirect(request, buildAuthHref("/reset_password/verify", nextPath));
   setResetAuth(next, {
     challengeId: String(data.challenge_id),
     email: String(data.email || getString(formData, "email")),
     purpose: String(data.purpose || "password_reset"),
     verified: false,
+    redirectTo: nextPath !== "/" ? nextPath : undefined,
   });
   return next;
 }
@@ -214,7 +255,7 @@ export async function resetVerifyPage(request: NextRequest): Promise<NextRespons
   return renderTemplate(
     request,
     "auth.html",
-    { mode: "reset_verify", email: session.resetAuth.email, form_action: "/reset_password/verify" },
+    buildAuthTemplateContext(request, "reset_verify", "/reset_password/verify", { email: session.resetAuth.email, next_path: session.resetAuth.redirectTo || "" }),
     "verify_reset_otp",
   );
 }
@@ -261,7 +302,7 @@ export async function resetPasswordPage(request: NextRequest): Promise<NextRespo
   return renderTemplate(
     request,
     "auth.html",
-    { mode: "reset_password", email: session.resetAuth.email, form_action: "/reset_password" },
+    buildAuthTemplateContext(request, "reset_password", "/reset_password", { email: session.resetAuth.email, next_path: session.resetAuth.redirectTo || "" }),
     "reset_password",
   );
 }
